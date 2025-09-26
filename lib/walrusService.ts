@@ -7,7 +7,17 @@ import { SuiClient } from '@mysten/sui/client';
 import { SealClient } from '@mysten/seal';
 import { fromHex, toHex } from '@mysten/sui/utils';
 
-export interface WalrusStoreResponse {
+export interface Wa  /**
+   * Store an encrypted image file on Walrus with whitelist integration
+   */
+  async storeImage(file: File, userAddress?: string): Promise<EncryptionResult> {
+    try {
+      console.log('🔐 Starting encrypted image storage process...');
+      console.log('📄 File:', file.name, file.size, 'bytes');
+      
+      if (userAddress) {
+        console.log('👤 User Address:', userAddress);
+      }sponse {
   newlyCreated?: {
     blobObject: {
       id: string;
@@ -44,10 +54,11 @@ export interface WalrusStoreResponse {
 
 // Sui configuration
 const SUI_CLIENT = new SuiClient({ url: 'https://fullnode.testnet.sui.io:443' });
-const PACKAGE_ID = '0xcfedf4e2445497ba1a5d57349d6fc116b194eca41524f46f593c63a7a70a8eab';
 
-// Government whitelist ID (should match the deployed whitelist)
-const GOVERNMENT_WHITELIST_ID = '0xca700b2604763639ba3fbf0237d4f1ab34470ac509d407d34030621b1a254747';
+// Your deployed whitelist contract details
+const PACKAGE_ID = '0x75ca17f12a335945207502f250f396e96b17609b641696af4af097b26ea85df7';
+const WHITELIST_OBJECT_ID = '0x1549b2b36e25f8b157b70571586bd3f7013111e8495adb3e0f4a70a0255d4e48';
+const ADMIN_CAP_ID = '0x8c679ac66b27d009e187b50862c48bfd3e36a03137f72a729e6b1817dd6cfade';
 
 // Seal server configurations - same as reference
 const serverObjectIds = [
@@ -293,9 +304,9 @@ export class WalrusService {
         console.log('👤 User Address:', userAddress);
       }
 
-      // Step 1: Generate encryption ID
+      // Step 1: Generate encryption ID using the whitelist object ID
       const nonce = crypto.getRandomValues(new Uint8Array(5));
-      const policyObjectBytes = fromHex(GOVERNMENT_WHITELIST_ID);
+      const policyObjectBytes = fromHex(WHITELIST_OBJECT_ID);
       const encryptionId = toHex(new Uint8Array([...policyObjectBytes, ...nonce]));
       
       console.log('🔑 Generated Encryption ID:', encryptionId);
@@ -536,5 +547,18 @@ export class WalrusService {
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
+  }
+
+
+
+  /**
+   * Get current contract configuration
+   */
+  getContractConfig() {
+    return {
+      packageId: PACKAGE_ID,
+      whitelistObjectId: WHITELIST_OBJECT_ID,
+      adminCapId: ADMIN_CAP_ID
+    };
   }
 }
