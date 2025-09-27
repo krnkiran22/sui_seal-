@@ -1,7 +1,9 @@
+"use client";
+
 import React from 'react';
 import { useCurrentAccount, ConnectButton, useDisconnectWallet } from '@mysten/dapp-kit';
 import { motion } from 'framer-motion';
-import { LogOut, User } from 'lucide-react';
+import { LogOut, User, AlertTriangle } from 'lucide-react';
 import AddressDisplay from './AddressDisplay';
 
 interface WalletConnectionProps {
@@ -17,6 +19,17 @@ const WalletConnection: React.FC<WalletConnectionProps> = ({
 }) => {
   const currentAccount = useCurrentAccount();
   const { mutate: disconnect } = useDisconnectWallet();
+
+  // Add error handling for wallet connection issues
+  if (typeof window === 'undefined') {
+    // Server-side rendering - show loading state
+    return (
+      <div className={`flex items-center space-x-2 ${className}`}>
+        <div className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin"></div>
+        <span className="text-sm text-gray-500">Loading wallet...</span>
+      </div>
+    );
+  }
 
   if (!currentAccount) {
     return (

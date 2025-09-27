@@ -1,3 +1,5 @@
+"use client";
+
 import React from 'react';
 import { useSuiClient } from '@mysten/dapp-kit';
 import { useSuiNS, useMockSuiNS, formatAddressOrName } from '../hooks/useSuiNS';

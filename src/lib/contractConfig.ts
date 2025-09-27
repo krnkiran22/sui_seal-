@@ -1,20 +1,22 @@
 // Simple Whitelist Contract Configuration  
-// Generated from deployment transaction: 8dxDFH1HUpdQG9QCj52FCJ4FiTNeEBZhdLERQXjctKvg
+// Generated from deployment transaction: BSW67ehViuxS4svULQqesENaBKk9o6NrtE3kEqR2krWa
+// ✅ UPDATED: Your address is now pre-whitelisted and has admin capabilities
 
 export const MULTI_ADMIN_WHITELIST_CONFIG = {
-  packageId: '0x75ca17f12a335945207502f250f396e96b17609b641696af4af097b26ea85df7',
-  whitelistObjectId: '0x1549b2b36e25f8b157b70571586bd3f7013111e8495adb3e0f4a70a0255d4e48',
+  packageId: '0xf5eb37ecb6228973a40d068c2b93e557bdde968931c654a339f8a02a53c07ff9',
+  whitelistObjectId: '0x54e37bd42ca0dff71fea7b25f8db7d8f33b0b50a20b363095c448968a929b0e9',
   adminCapIds: {
-    // Deployer admin cap
-    deployer: '0x8c679ac66b27d009e187b50862c48bfd3e36a03137f72a729e6b1817dd6cfade',
-    // The configured admin (0x0129fc626e3656cfa624cb324826dd5e60782d6f309d11a4450ebde0d974e0a5) will get their cap automatically
+    // Deployer admin cap (for deployer address)
+    deployer: '0x866e667ecd04a3eed33e9de2bd1d845018dc384db0f83902c2710004b980dfd3',
+    // Your admin cap (for your specific address)
+    configured: '0xfaed774b49dc3865d45ac72b36a764c5d229fa166258e370a0fb3dca71034d6f'
   },
   adminAddresses: {
-    deployer: '0x0129fc626e3656cfa624cb324826dd5e60782d6f309d11a4450ebde0d974e0a5', // Your wallet address
-    configured: '0x0129fc626e3656cfa624cb324826dd5e60782d6f309d11a4450ebde0d974e0a5' // Your wallet address as configured admin
+    deployer: '0xbc5f1715965ee6b959d912c8de19ab012042407813614267141eb7197914711b', // Deployer address
+    configured: '0x0129fc626e3656cfa624cb324826dd5e60782d6f309d11a4450ebde0d974e0a5' // Your wallet address - PRE-WHITELISTED
   },
   network: 'testnet',
-  transactionHash: '8dxDFH1HUpdQG9QCj52FCJ4FiTNeEBZhdLERQXjctKvg'
+  transactionHash: 'BSW67ehViuxS4svULQqesENaBKk9o6NrtE3kEqR2krWa'
 };
 
 // For backward compatibility with existing components

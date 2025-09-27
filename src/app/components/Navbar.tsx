@@ -48,25 +48,29 @@ const Navbar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
         <div className="flex justify-between items-center h-20">
           {/* Logo Section */}
-          <Link href="/" className="flex items-center space-x-3 group">
+          <Link href="/" className="flex items-center space-x-4 group">
             <motion.div
               whileHover={{ scale: 1.05 }}
               transition={{ duration: 0.2 }}
               className="relative"
             >
-              <div className="w-10 h-10 bg-[#4da2ff] rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300">
-                <span className="text-white font-clash font-semibold text-lg">
-                  S
-                </span>
-              </div>
+              <img 
+                src="/logo.png" 
+                alt="SuiSeal Logo"
+                className="w-12 h-12 rounded-xl shadow-lg group-hover:shadow-xl transition-all duration-300"
+                onError={(e) => {
+                  // Fallback to SVG if PNG is not available
+                  e.currentTarget.src = "/logo.svg";
+                }}
+              />
             </motion.div>
-            <span className="font-clash font-medium text-2xl text-gray-900 tracking-tight">
-              SuiPatent
+            <span className="font-clash font-semibold text-2xl text-gray-900 tracking-tight">
+              SuiSeal
             </span>
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center space-x-1">
+          <div className="hidden lg:flex items-center space-x-3">
             {navigation.map((item, index) => (
               <Link key={item.name} href={item.href}>
                 <motion.div
@@ -74,7 +78,7 @@ const Navbar: React.FC = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, delay: index * 0.1 }}
                   whileHover={{ y: -1 }}
-                  className={`relative px-5 py-2.5 rounded-xl text-sm font-clash font-medium transition-all duration-300 ${
+                  className={`relative px-6 py-3 rounded-xl text-sm font-clash font-medium transition-all duration-300 ${
                     isActive(item.href)
                       ? "text-[#4da2ff] bg-[#4da2ff]/10 shadow-sm"
                       : "text-gray-700 hover:text-[#4da2ff] hover:bg-gray-50 hover:shadow-sm"
@@ -100,7 +104,7 @@ const Navbar: React.FC = () => {
               transition={{ duration: 0.4, delay: 0.5 }}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="ml-8"
+              className="ml-12"
             >
               <WalletConnection showDisconnect={true} />
             </motion.div>

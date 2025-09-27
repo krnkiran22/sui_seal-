@@ -7,7 +7,7 @@ import { Transaction } from '@mysten/sui/transactions';
 import { Shield, UserPlus, CheckCircle, AlertCircle, Users, Hash, Key, Wallet } from 'lucide-react';
 import { MULTI_ADMIN_WHITELIST_CONFIG } from '../../lib/contractConfig';
 import AddressDisplay from '../../components/AddressDisplay';
-import WalletAddressHelper from '../../components/WalletAddressHelper';
+import { useToast } from '../../components/Toast';
 
 const AdminPage: React.FC = () => {
   const currentAccount = useCurrentAccount();
@@ -16,7 +16,7 @@ const AdminPage: React.FC = () => {
   const [userToAdd, setUserToAdd] = useState('');
   const [whitelistedUsers, setWhitelistedUsers] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const { showSuccess, showError } = useToast();
 
   // Check if current user is an admin
   const isAdmin = currentAccount && (
@@ -49,12 +49,12 @@ const AdminPage: React.FC = () => {
 
   const handleAddUser = async () => {
     if (!currentAccount || !isAdmin) {
-      setNotification({ type: 'error', message: 'Admin access required' });
+      showError('Access Denied', 'Admin access required');
       return;
     }
 
     if (!userToAdd.trim()) {
-      setNotification({ type: 'error', message: 'Please enter a valid address' });
+      showError('Invalid Input', 'Please enter a valid address');
       return;
     }
 
@@ -63,12 +63,19 @@ const AdminPage: React.FC = () => {
     try {
       const tx = new Transaction();
       
-      // Call the government whitelist contract to add government address
+      // Determine which AdminCap to use based on current user
+      const adminCapId = currentAccount.address === MULTI_ADMIN_WHITELIST_CONFIG.adminAddresses.deployer 
+        ? MULTI_ADMIN_WHITELIST_CONFIG.adminCapIds.deployer
+        : MULTI_ADMIN_WHITELIST_CONFIG.adminCapIds.configured;
+      
+      console.log('🔧 Using AdminCap:', adminCapId, 'for address:', currentAccount.address);
+      
+      // Call the simple whitelist contract to add address to whitelist
       tx.moveCall({
-        target: `${MULTI_ADMIN_WHITELIST_CONFIG.packageId}::government_whitelist::add_government_address`,
+        target: `${MULTI_ADMIN_WHITELIST_CONFIG.packageId}::simple_whitelist::add_address`,
         arguments: [
           tx.object(MULTI_ADMIN_WHITELIST_CONFIG.whitelistObjectId),
-          tx.object(MULTI_ADMIN_WHITELIST_CONFIG.adminCapIds.deployer), // Use deployer cap
+          tx.object(adminCapId), // Use correct admin cap based on current user
           tx.pure.address(userToAdd.trim()),
         ],
       });
@@ -78,27 +85,25 @@ const AdminPage: React.FC = () => {
         {
           onSuccess: (result) => {
             console.log('✅ Government address added:', result);
-            setNotification({ 
-              type: 'success', 
-              message: `Government address added successfully! TX: ${result.digest.slice(0, 8)}...` 
-            });
+            showSuccess(
+              'Address Added Successfully!', 
+              `Transaction: ${result.digest.slice(0, 8)}...`
+            );
             setUserToAdd('');
             loadWhitelistedUsers();
           },
           onError: (error) => {
             console.error('❌ Failed to add government address:', error);
-            setNotification({ type: 'error', message: `Failed to add address: ${error.message}` });
+            showError('Transaction Failed', error.message);
           },
         }
       );
     } catch (error) {
       console.error('❌ Transaction error:', error);
-      setNotification({ type: 'error', message: error instanceof Error ? error.message : 'Transaction failed' });
+      showError('Transaction Error', error instanceof Error ? error.message : 'Transaction failed');
     } finally {
       setLoading(false);
     }
-
-    setTimeout(() => setNotification(null), 5000);
   };
 
   return (
@@ -152,31 +157,8 @@ const AdminPage: React.FC = () => {
                 </div>
               </div>
             )}
-          </div>
 
-          <AnimatePresence>
-            {notification && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className={`mb-8 rounded-2xl p-6 font-clash ${
-                  notification.type === "success"
-                    ? "bg-[#4da2ff]/5 border border-[#4da2ff]/30 text-[#4da2ff]"
-                    : "bg-red-50 border border-red-200 text-red-800"
-                }`}
-              >
-                <div className="flex items-center space-x-3">
-                  {notification.type === "success" ? (
-                    <CheckCircle className="w-5 h-5" />
-                  ) : (
-                    <AlertCircle className="w-5 h-5" />
-                  )}
-                  <span className="font-medium">{notification.message}</span>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          </div>
 
           {!currentAccount && (
             <div className="mb-8 p-6 bg-yellow-50 border border-yellow-200 rounded-xl">
@@ -210,11 +192,10 @@ const AdminPage: React.FC = () => {
               
               <div className="p-6 bg-blue-50 border border-blue-200 rounded-xl">
                 <h3 className="font-clash font-medium text-blue-800 mb-4">Fix This Issue:</h3>
-                <WalletAddressHelper />
                 <div className="mt-4 text-sm text-blue-700">
-                  <p className="mb-2"><strong>Option 1:</strong> Update the contract configuration file with your address</p>
-                  <p className="mb-2"><strong>Option 2:</strong> Deploy a new contract with your address as admin</p>
-                  <p className="text-xs text-blue-600">Copy your address above and update <code>contractConfig.ts</code></p>
+                  <p className="mb-2"><strong>Your Address:</strong> <code className="bg-white px-2 py-1 rounded">{currentAccount.address}</code></p>
+                  <p className="mb-2"><strong>Solution:</strong> Update the contract configuration with your address as admin</p>
+                  <p className="text-xs text-blue-600">Contact the administrator to add your address to the admin list</p>
                 </div>
               </div>
             </div>

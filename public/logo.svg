@@ -1,0 +1,6 @@
+<!-- This is a placeholder. Replace with your actual logo -->
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="32" height="32" rx="8" fill="#4da2ff"/>
+  <path d="M8 12h16v8H8z" fill="#ffffff"/>
+  <circle cx="16" cy="16" r="3" fill="#4da2ff"/>
+</svg>

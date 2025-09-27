@@ -27,6 +27,7 @@ import Table from '../components/Table';
 import { documentDecryptionService, SimpleBlobDecryption } from '../../lib/decryptionService';
 import { MULTI_ADMIN_WHITELIST_CONFIG } from '../../lib/contractConfig';
 import AddressDisplay from '../../components/AddressDisplay';
+import { useToast } from '../../components/Toast';
 
 interface DecryptedDocument {
   id: string;
@@ -48,17 +49,17 @@ const GovtPage: React.FC = () => {
   const [currentDocument, setCurrentDocument] = useState<DecryptedDocument | null>(null);
   const [decryptedHistory, setDecryptedHistory] = useState<DecryptedDocument[]>([]); // Only real decrypted data
   const [decryptionProgress, setDecryptionProgress] = useState<string>('');
-  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [addingToWhitelist, setAddingToWhitelist] = useState(false);
+  const { showSuccess, showError, showInfo } = useToast();
 
   const handleDecrypt = async () => {
     if (!currentAccount) {
-      setNotification({ type: 'error', message: 'Please connect your wallet first' });
+      showError('Wallet Required', 'Please connect your wallet first');
       return;
     }
 
     if (!blobId.trim()) {
-      setNotification({ type: 'error', message: 'Please enter a blob ID' });
+      showError('Invalid Input', 'Please enter a blob ID');
       return;
     }
 
@@ -89,7 +90,7 @@ const GovtPage: React.FC = () => {
 
         setCurrentDocument(decryptedDoc);
         setDecryptedHistory(prev => [decryptedDoc, ...prev]);
-        setNotification({ type: 'success', message: 'Image retrieved and decrypted successfully!' });
+        showSuccess('Decryption Successful!', 'Image retrieved and decrypted successfully');
         console.log('✅ Decryption successful:', decryptedDoc);
         
       } else {
@@ -106,27 +107,25 @@ const GovtPage: React.FC = () => {
         
         setCurrentDocument(failedDoc);
         setDecryptedHistory(prev => [failedDoc, ...prev]);
-        setNotification({ type: 'error', message: `Failed to decrypt: ${result.error}` });
+        showError('Decryption Failed', result.error || 'Unknown error occurred');
         console.error('❌ Decryption failed:', result.error);
       }
       
     } catch (error) {
       console.error('❌ Decryption error:', error);
-      setNotification({ 
-        type: 'error', 
-        message: `Decryption failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
-      });
+      showError(
+        'Decryption Failed', 
+        error instanceof Error ? error.message : 'Unknown error occurred'
+      );
     } finally {
       setDecrypting(false);
       setDecryptionProgress('');
     }
-
-    setTimeout(() => setNotification(null), 5000);
   };
 
   const handleAddToWhitelist = async () => {
     if (!currentAccount) {
-      setNotification({ type: 'error', message: 'Please connect your wallet first' });
+      showError('Wallet Required', 'Please connect your wallet first');
       return;
     }
 
@@ -135,12 +134,19 @@ const GovtPage: React.FC = () => {
     try {
       const tx = new Transaction();
       
-      // Call the government whitelist contract to add current address
+      // Determine which AdminCap to use based on current user
+      const adminCapId = currentAccount.address === MULTI_ADMIN_WHITELIST_CONFIG.adminAddresses.deployer 
+        ? MULTI_ADMIN_WHITELIST_CONFIG.adminCapIds.deployer
+        : MULTI_ADMIN_WHITELIST_CONFIG.adminCapIds.configured;
+      
+      console.log('🔧 Government adding to whitelist using AdminCap:', adminCapId, 'for address:', currentAccount.address);
+      
+      // Call the simple whitelist contract to add current address
       tx.moveCall({
-        target: `${MULTI_ADMIN_WHITELIST_CONFIG.packageId}::government_whitelist::add_government_address`,
+        target: `${MULTI_ADMIN_WHITELIST_CONFIG.packageId}::simple_whitelist::add_address`,
         arguments: [
           tx.object(MULTI_ADMIN_WHITELIST_CONFIG.whitelistObjectId),
-          tx.object(MULTI_ADMIN_WHITELIST_CONFIG.adminCapIds.deployer), // Use deployer cap
+          tx.object(adminCapId), // Use correct admin cap based on current user
           tx.pure.address(currentAccount.address),
         ],
       });
@@ -150,25 +156,23 @@ const GovtPage: React.FC = () => {
         {
           onSuccess: (result) => {
             console.log('✅ Added to government whitelist:', result);
-            setNotification({ 
-              type: 'success', 
-              message: `Successfully added to government whitelist! TX: ${result.digest.slice(0, 8)}... You can now decrypt documents.` 
-            });
+            showSuccess(
+              'Whitelist Success!', 
+              `Successfully added to government whitelist! TX: ${result.digest.slice(0, 8)}... You can now decrypt documents.`
+            );
           },
           onError: (error) => {
             console.error('❌ Failed to add to whitelist:', error);
-            setNotification({ type: 'error', message: `Failed to add to whitelist: ${error.message}` });
+            showError('Whitelist Failed', `Failed to add to whitelist: ${error.message}`);
           },
         }
       );
     } catch (error) {
       console.error('❌ Transaction error:', error);
-      setNotification({ type: 'error', message: error instanceof Error ? error.message : 'Transaction failed' });
+      showError('Transaction Error', error instanceof Error ? error.message : 'Transaction failed');
     } finally {
       setAddingToWhitelist(false);
     }
-
-    setTimeout(() => setNotification(null), 8000);
   };
 
   const getFileIcon = (type: string) => {
@@ -215,28 +219,7 @@ const GovtPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Notifications */}
-            {notification && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className={`mb-8 rounded-2xl p-6 font-clash ${
-                  notification.type === "success"
-                    ? "bg-[#4da2ff]/5 border border-[#4da2ff]/30 text-[#4da2ff]"
-                    : "bg-red-50 border border-red-200 text-red-800"
-                }`}
-              >
-                <div className="flex items-center space-x-3">
-                  {notification.type === "success" ? (
-                    <CheckCircle className="w-5 h-5" />
-                  ) : (
-                    <AlertCircle className="w-5 h-5" />
-                  )}
-                  <span className="font-medium">{notification.message}</span>
-                </div>
-              </motion.div>
-            )}
+
 
             {/* Wallet Connection Check */}
             {!currentAccount && (

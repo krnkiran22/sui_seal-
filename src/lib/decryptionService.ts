@@ -8,8 +8,12 @@ import { MULTI_ADMIN_WHITELIST_CONFIG } from './contractConfig';
 
 // Configuration matching the latest deployment
 const SUI_CLIENT = new SuiClient({ url: 'https://fullnode.testnet.sui.io:443' });
-const PACKAGE_ID = MULTI_ADMIN_WHITELIST_CONFIG.packageId; // 0x75ca17f12a335945207502f250f396e96b17609b641696af4af097b26ea85df7
-const GOVERNMENT_WHITELIST_ID = MULTI_ADMIN_WHITELIST_CONFIG.whitelistObjectId; // 0x1549b2b36e25f8b157b70571586bd3f7013111e8495adb3e0f4a70a0255d4e48
+const PACKAGE_ID = MULTI_ADMIN_WHITELIST_CONFIG.packageId; // Updated to new deployment
+const GOVERNMENT_WHITELIST_ID = MULTI_ADMIN_WHITELIST_CONFIG.whitelistObjectId; // Updated to new deployment
+
+console.log('🔧 Using contract configuration:');
+console.log('📦 Package ID:', PACKAGE_ID);
+console.log('📋 Whitelist ID:', GOVERNMENT_WHITELIST_ID);
 
 // Seal server configurations
 const serverObjectIds = [
@@ -66,27 +70,33 @@ export class DocumentDecryptionService {
   async isGovernmentAuthorized(address: string): Promise<boolean> {
     try {
       console.log('🔍 Checking government authorization for:', address);
+      console.log('📍 Using whitelist ID:', GOVERNMENT_WHITELIST_ID);
       
-      const result = await SUI_CLIENT.getObject({
-        id: GOVERNMENT_WHITELIST_ID,
-        options: {
-          showContent: true,
-        },
+      // Call the contract's is_whitelisted function to check authorization
+      const tx = new Transaction();
+      tx.moveCall({
+        target: `${PACKAGE_ID}::simple_whitelist::is_whitelisted`,
+        arguments: [
+          tx.object(GOVERNMENT_WHITELIST_ID),
+          tx.pure.address(address),
+        ],
       });
 
-      if (result.data?.content && 'fields' in result.data.content) {
-        const fields = result.data.content.fields as any;
-        
-        // Check government_addresses table
-        const governmentAddresses = fields.government_addresses;
-        if (governmentAddresses && governmentAddresses.fields) {
-          // This is a simplified check - in practice we'd need to iterate through the table
-          console.log('✅ Government address authorized');
-          return true; // For demo purposes, allow access if connected
+      const result = await SUI_CLIENT.devInspectTransactionBlock({
+        transactionBlock: tx,
+        sender: address,
+      });
+
+      if (result.results && result.results[0] && result.results[0].returnValues) {
+        const returnValue = result.results[0].returnValues[0];
+        if (returnValue && returnValue[0]) {
+          const isWhitelisted = returnValue[0][0] === 1; // 1 = true, 0 = false
+          console.log(`✅ Authorization check result: ${isWhitelisted ? 'AUTHORIZED' : 'NOT AUTHORIZED'}`);
+          return isWhitelisted;
         }
       }
       
-      console.log('❌ Could not verify government authorization');
+      console.log('❌ Could not verify government authorization - no return value');
       return false;
     } catch (error) {
       console.error('❌ Government authorization check failed:', error);
