@@ -6,6 +6,8 @@ import { useCurrentAccount, useSignAndExecuteTransaction, ConnectButton } from '
 import { Transaction } from '@mysten/sui/transactions';
 import { Shield, UserPlus, CheckCircle, AlertCircle, Users, Hash, Key, Wallet } from 'lucide-react';
 import { MULTI_ADMIN_WHITELIST_CONFIG } from '../../lib/contractConfig';
+import AddressDisplay from '../../components/AddressDisplay';
+import WalletAddressHelper from '../../components/WalletAddressHelper';
 
 const AdminPage: React.FC = () => {
   const currentAccount = useCurrentAccount();
@@ -118,6 +120,38 @@ const AdminPage: React.FC = () => {
                 Add government officials to the whitelist so they can decrypt any encrypted documents uploaded by users
               </p>
             </div>
+
+            {/* Admin Wallet Status */}
+            {currentAccount && (
+              <div className={`mb-8 p-6 rounded-2xl ${isAdmin ? 'bg-blue-50 border border-blue-200' : 'bg-yellow-50 border border-yellow-200'}`}>
+                <div className="flex items-center space-x-3">
+                  <Shield className={`w-5 h-5 ${isAdmin ? 'text-blue-600' : 'text-yellow-600'}`} />
+                  <div className="flex-1">
+                    <p className={`font-clash font-medium ${isAdmin ? 'text-blue-800' : 'text-yellow-800'}`}>
+                      {isAdmin ? 'Admin Wallet Connected' : 'Wallet Connected (Not Admin)'}
+                    </p>
+                    <div className="text-sm mt-2 space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <span className={isAdmin ? 'text-blue-700' : 'text-yellow-700'}>Your Address:</span>
+                        <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">
+                          {currentAccount.address}
+                        </code>
+                      </div>
+                      <div className={`text-xs ${isAdmin ? 'text-blue-600' : 'text-yellow-600'}`}>
+                        <p>Expected Admin Addresses:</p>
+                        <p>• Deployer: {MULTI_ADMIN_WHITELIST_CONFIG.adminAddresses.deployer}</p>
+                        <p>• Configured: {MULTI_ADMIN_WHITELIST_CONFIG.adminAddresses.configured}</p>
+                        <p className="mt-1">
+                          Status: {currentAccount.address === MULTI_ADMIN_WHITELIST_CONFIG.adminAddresses.deployer || 
+                                  currentAccount.address === MULTI_ADMIN_WHITELIST_CONFIG.adminAddresses.configured 
+                                  ? '✅ Match Found' : '❌ No Match'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <AnimatePresence>
@@ -154,18 +188,33 @@ const AdminPage: React.FC = () => {
                     <p className="text-sm text-yellow-700 mt-1">Connect your admin wallet to manage government addresses</p>
                   </div>
                 </div>
-                <ConnectButton />
+                <ConnectButton 
+                  connectText="Connect Admin Wallet"
+                  className="bg-[#4da2ff] hover:bg-[#3d91ef] text-white px-6 py-2 rounded-lg transition-all duration-300 font-clash font-medium"
+                />
               </div>
             </div>
           )}
 
           {currentAccount && !isAdmin && (
-            <div className="mb-8 p-6 bg-red-50 border border-red-200 rounded-xl">
-              <div className="flex items-center space-x-3">
-                <AlertCircle className="w-5 h-5 text-red-600" />
-                <div>
-                  <p className="font-clash font-medium text-red-800">Insufficient Permissions</p>
-                  <p className="text-sm text-red-700 mt-1">Your address is not authorized to perform admin functions</p>
+            <div className="mb-8 space-y-4">
+              <div className="p-6 bg-red-50 border border-red-200 rounded-xl">
+                <div className="flex items-center space-x-3">
+                  <AlertCircle className="w-5 h-5 text-red-600" />
+                  <div>
+                    <p className="font-clash font-medium text-red-800">Insufficient Permissions</p>
+                    <p className="text-sm text-red-700 mt-1">Your address is not authorized to perform admin functions</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-6 bg-blue-50 border border-blue-200 rounded-xl">
+                <h3 className="font-clash font-medium text-blue-800 mb-4">Fix This Issue:</h3>
+                <WalletAddressHelper />
+                <div className="mt-4 text-sm text-blue-700">
+                  <p className="mb-2"><strong>Option 1:</strong> Update the contract configuration file with your address</p>
+                  <p className="mb-2"><strong>Option 2:</strong> Deploy a new contract with your address as admin</p>
+                  <p className="text-xs text-blue-600">Copy your address above and update <code>contractConfig.ts</code></p>
                 </div>
               </div>
             </div>

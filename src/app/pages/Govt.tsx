@@ -15,13 +15,18 @@ import {
   Hash,
   AlertCircle,
   CheckCircle,
-  Wallet
+  Wallet,
+  Shield,
+  UserPlus
 } from 'lucide-react';
-import { useCurrentAccount, ConnectButton } from '@mysten/dapp-kit';
+import { useCurrentAccount, ConnectButton, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
+import { Transaction } from '@mysten/sui/transactions';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import Table from '../components/Table';
 import { documentDecryptionService, SimpleBlobDecryption } from '../../lib/decryptionService';
+import { MULTI_ADMIN_WHITELIST_CONFIG } from '../../lib/contractConfig';
+import AddressDisplay from '../../components/AddressDisplay';
 
 interface DecryptedDocument {
   id: string;
@@ -37,12 +42,14 @@ interface DecryptedDocument {
 
 const GovtPage: React.FC = () => {
   const currentAccount = useCurrentAccount();
+  const { mutate: signAndExecute } = useSignAndExecuteTransaction();
   const [blobId, setBlobId] = useState('');
   const [decrypting, setDecrypting] = useState(false);
   const [currentDocument, setCurrentDocument] = useState<DecryptedDocument | null>(null);
   const [decryptedHistory, setDecryptedHistory] = useState<DecryptedDocument[]>([]); // Only real decrypted data
   const [decryptionProgress, setDecryptionProgress] = useState<string>('');
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [addingToWhitelist, setAddingToWhitelist] = useState(false);
 
   const handleDecrypt = async () => {
     if (!currentAccount) {
@@ -115,6 +122,53 @@ const GovtPage: React.FC = () => {
     }
 
     setTimeout(() => setNotification(null), 5000);
+  };
+
+  const handleAddToWhitelist = async () => {
+    if (!currentAccount) {
+      setNotification({ type: 'error', message: 'Please connect your wallet first' });
+      return;
+    }
+
+    setAddingToWhitelist(true);
+
+    try {
+      const tx = new Transaction();
+      
+      // Call the government whitelist contract to add current address
+      tx.moveCall({
+        target: `${MULTI_ADMIN_WHITELIST_CONFIG.packageId}::government_whitelist::add_government_address`,
+        arguments: [
+          tx.object(MULTI_ADMIN_WHITELIST_CONFIG.whitelistObjectId),
+          tx.object(MULTI_ADMIN_WHITELIST_CONFIG.adminCapIds.deployer), // Use deployer cap
+          tx.pure.address(currentAccount.address),
+        ],
+      });
+
+      signAndExecute(
+        { transaction: tx },
+        {
+          onSuccess: (result) => {
+            console.log('✅ Added to government whitelist:', result);
+            setNotification({ 
+              type: 'success', 
+              message: `Successfully added to government whitelist! TX: ${result.digest.slice(0, 8)}... You can now decrypt documents.` 
+            });
+          },
+          onError: (error) => {
+            console.error('❌ Failed to add to whitelist:', error);
+            setNotification({ type: 'error', message: `Failed to add to whitelist: ${error.message}` });
+          },
+        }
+      );
+    } catch (error) {
+      console.error('❌ Transaction error:', error);
+      setNotification({ type: 'error', message: error instanceof Error ? error.message : 'Transaction failed' });
+    } finally {
+      setAddingToWhitelist(false);
+    }
+
+    setTimeout(() => setNotification(null), 8000);
   };
 
   const getFileIcon = (type: string) => {
@@ -199,7 +253,10 @@ const GovtPage: React.FC = () => {
                       </p>
                     </div>
                   </div>
-                  <ConnectButton />
+                  <ConnectButton 
+                    connectText="Connect Government Wallet"
+                    className="bg-[#4da2ff] hover:bg-[#3d91ef] text-white px-6 py-2 rounded-lg transition-all duration-300 font-clash font-medium"
+                  />
                 </div>
               </div>
             )}
@@ -210,8 +267,50 @@ const GovtPage: React.FC = () => {
                   <CheckCircle className="w-5 h-5 text-green-600" />
                   <div>
                     <p className="font-clash font-medium text-green-800">Government Wallet Connected</p>
-                    <p className="text-sm text-green-700 font-mono mt-1">{currentAccount.address}</p>
+                    <div className="text-sm text-green-700 mt-1 flex items-center space-x-2">
+                      <span>Address:</span>
+                      <AddressDisplay 
+                        address={currentAccount.address}
+                        className="font-mono"
+                        showFull={false}
+                        enableSuiNS={true}
+                      />
+                    </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Authorization Setup */}
+            {currentAccount && (
+              <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-2xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Shield className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <p className="font-clash font-medium text-blue-800">Government Authorization</p>
+                      <p className="text-sm text-blue-700 mt-1">
+                        If you get "Access denied" errors, add your address to the government whitelist first.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleAddToWhitelist}
+                    disabled={addingToWhitelist}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-clash text-sm font-medium transition-all duration-300 flex items-center space-x-2"
+                  >
+                    {addingToWhitelist ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Adding...</span>
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="w-4 h-4" />
+                        <span>Add to Whitelist</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             )}

@@ -10,8 +10,8 @@ export const MULTI_ADMIN_WHITELIST_CONFIG = {
     // The configured admin (0x0129fc626e3656cfa624cb324826dd5e60782d6f309d11a4450ebde0d974e0a5) will get their cap automatically
   },
   adminAddresses: {
-    deployer: '0xbc5f1715965ee6b959d912c8de19ab012042407813614267141eb7197914711b',
-    configured: '0x0129fc626e3656cfa624cb324826dd5e60782d6f309d11a4450ebde0d974e0a5' // Pre-configured admin for demo
+    deployer: '0x0129fc626e3656cfa624cb324826dd5e60782d6f309d11a4450ebde0d974e0a5', // Your wallet address
+    configured: '0x0129fc626e3656cfa624cb324826dd5e60782d6f309d11a4450ebde0d974e0a5' // Your wallet address as configured admin
   },
   network: 'testnet',
   transactionHash: '8dxDFH1HUpdQG9QCj52FCJ4FiTNeEBZhdLERQXjctKvg'
