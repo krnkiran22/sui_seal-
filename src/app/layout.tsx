@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import WalletProviders from "../providers/WalletProvider";
 
 export const metadata: Metadata = {
   title: "Sui Patent",
@@ -29,11 +30,13 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <div className="min-h-screen bg-white flex flex-col">
-          <Navbar />
-          <main className="flex-1">{children}</main>
-          <Footer />
-        </div>
+        <WalletProviders>
+          <div className="min-h-screen bg-white flex flex-col">
+            <Navbar />
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </div>
+        </WalletProviders>
       </body>
     </html>
   );

@@ -53,12 +53,12 @@ export interface EncryptionResult {
 // Sui configuration
 const SUI_CLIENT = new SuiClient({ url: 'https://fullnode.testnet.sui.io:443' });
 
-// Import the new multi-admin whitelist contract configuration
+// Import the contract configuration
 import { MULTI_ADMIN_WHITELIST_CONFIG } from './contractConfig';
 
-// Your deployed multi-admin whitelist contract details
-const PACKAGE_ID = MULTI_ADMIN_WHITELIST_CONFIG.packageId;
-const WHITELIST_OBJECT_ID = MULTI_ADMIN_WHITELIST_CONFIG.whitelistObjectId;
+// Deployed simple whitelist contract details
+const PACKAGE_ID = MULTI_ADMIN_WHITELIST_CONFIG.packageId; // 0x75ca17f12a335945207502f250f396e96b17609b641696af4af097b26ea85df7
+const WHITELIST_OBJECT_ID = MULTI_ADMIN_WHITELIST_CONFIG.whitelistObjectId; // 0x1549b2b36e25f8b157b70571586bd3f7013111e8495adb3e0f4a70a0255d4e48
 // Note: Admin caps are now dynamically determined based on current user
 
 // Seal server configurations - same as reference

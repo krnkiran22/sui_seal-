@@ -2,7 +2,8 @@
 
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, FileText, Image, Video, Trash2, CheckCircle, AlertCircle, Hash, Zap, Hexagon, Triangle, Layers } from 'lucide-react';
+import { Upload, FileText, Image, Video, Trash2, CheckCircle, AlertCircle, Hash, Zap, Hexagon, Triangle, Layers, Wallet } from 'lucide-react';
+import { useCurrentAccount } from '@mysten/dapp-kit';
 import { walrusService, EncryptionResult } from '../../lib/walrusService';
 
 interface UploadedFile {
@@ -15,10 +16,10 @@ interface UploadedFile {
 }
 
 const UploadPage: React.FC = () => {
+  const currentAccount = useCurrentAccount();
   const [dragActive, setDragActive] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [suinsIdentity, setSuinsIdentity] = useState('');
   const [uploading, setUploading] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -69,6 +70,11 @@ const UploadPage: React.FC = () => {
   };
 
   const handleUpload = async () => {
+    if (!currentAccount) {
+      setNotification({ type: 'error', message: 'Please connect your wallet first' });
+      return;
+    }
+
     if (files.length === 0) {
       setNotification({ type: 'error', message: 'Please select files to upload' });
       return;
@@ -78,15 +84,16 @@ const UploadPage: React.FC = () => {
     
     try {
       console.log('🚀 Starting real Walrus upload for', files.length, 'files...');
+      console.log('👤 Wallet address:', currentAccount.address);
       
       const newUploadedFiles: UploadedFile[] = [];
       
-      // Upload each file to Walrus
+      // Upload each file to Walrus using real encryption
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         console.log(`📤 Uploading file ${i + 1}/${files.length}: ${file.name}`);
         
-        const result: EncryptionResult = await walrusService.storeImage(file);
+        const result: EncryptionResult = await walrusService.storeImage(file, currentAccount.address);
         
         if (result.success && result.blobId) {
           newUploadedFiles.push({
@@ -104,14 +111,15 @@ const UploadPage: React.FC = () => {
         }
       }
 
+      // Only update with real uploaded files
       setUploadedFiles(prev => [...prev, ...newUploadedFiles]);
       setFiles([]);
       setNotification({ 
         type: 'success', 
-        message: `Successfully uploaded ${newUploadedFiles.length} file(s) to Walrus storage` 
+        message: `Successfully uploaded ${newUploadedFiles.length} file(s) to Walrus storage with encryption` 
       });
       
-      console.log('🎉 All files uploaded successfully!', newUploadedFiles);
+      console.log('🎉 All files uploaded and encrypted successfully!', newUploadedFiles);
     } catch (error) {
       console.error('❌ Upload failed:', error);
       setNotification({ 
@@ -192,22 +200,18 @@ const UploadPage: React.FC = () => {
                 </div>
                 
                 <div className="p-8">
-                  {/* Metadata Input */}
-                  <div className="mb-8">
-                    <label className="block text-sm font-clash font-medium text-gray-700 mb-4">
-                      <span className="flex items-center space-x-2">
-                        <Hash className="w-4 h-4" />
-                        <span>Metadata (Optional)</span>
-                      </span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Enter your metadata here..."
-                      value={suinsIdentity}
-                      onChange={(e) => setSuinsIdentity(e.target.value)}
-                      className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:outline-none focus:border-[#4da2ff] text-sm font-clash text-gray-800 placeholder-gray-400 transition-all duration-300 hover:border-gray-300"
-                    />
-                  </div>
+                  {/* Wallet Connection Check */}
+                  {!currentAccount && (
+                    <div className="mb-8 p-6 bg-yellow-50 border border-yellow-200 rounded-xl">
+                      <div className="flex items-center space-x-3">
+                        <Wallet className="w-5 h-5 text-yellow-600" />
+                        <div>
+                          <p className="font-clash font-medium text-yellow-800">Wallet Connection Required</p>
+                          <p className="text-sm text-yellow-700 mt-1">Please connect your Sui wallet using the Connect Wallet button in the navigation bar to upload and encrypt files</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Drag and Drop Area */}
                   <div

@@ -14,11 +14,14 @@ import {
   User,
   Hash,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Wallet
 } from 'lucide-react';
+import { useCurrentAccount } from '@mysten/dapp-kit';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import Table from '../components/Table';
+import { documentDecryptionService, SimpleBlobDecryption } from '../../lib/decryptionService';
 
 interface DecryptedDocument {
   id: string;
@@ -27,100 +30,88 @@ interface DecryptedDocument {
   size: number;
   blobId: string;
   decryptedAt: Date;
-  uploader: string;
   status: 'decrypted' | 'failed';
-  content?: string;
-}
-
-interface UploadedDocument {
-  id: string;
-  name: string;
-  blobId: string;
-  uploadedAt: Date;
-  uploader: string;
+  imageUrl?: string; // URL for decrypted image
+  error?: string;
 }
 
 const GovtPage: React.FC = () => {
+  const currentAccount = useCurrentAccount();
   const [blobId, setBlobId] = useState('');
-  const [selectedDocument, setSelectedDocument] = useState<UploadedDocument | null>(null);
   const [decrypting, setDecrypting] = useState(false);
   const [currentDocument, setCurrentDocument] = useState<DecryptedDocument | null>(null);
-  const [decryptedHistory, setDecryptedHistory] = useState<DecryptedDocument[]>([
-    {
-      id: '1',
-      name: 'patent_application_2024_001.pdf',
-      type: 'application/pdf',
-      size: 2048000,
-      blobId: '0x1234567890abcdef1234567890abcdef12345678901234567890abcdef123456',
-      decryptedAt: new Date('2024-01-20T10:30:00'),
-      uploader: 'inventor.sui',
-      status: 'decrypted',
-    },
-    {
-      id: '2',
-      name: 'invention_diagram.png',
-      type: 'image/png',
-      size: 1024000,
-      blobId: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-      decryptedAt: new Date('2024-01-19T14:15:00'),
-      uploader: 'researcher.sui',
-      status: 'decrypted',
-    }
-  ]);
-  const [uploadedDocuments] = useState<UploadedDocument[]>([
-    {
-      id: '1',
-      name: 'patent_application_2024_001.pdf',
-      blobId: '0x1234567890abcdef1234567890abcdef12345678901234567890abcdef123456',
-      uploadedAt: new Date('2024-01-15T09:00:00'),
-      uploader: 'inventor.sui',
-    },
-    {
-      id: '2',
-      name: 'invention_diagram.png',
-      blobId: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-      uploadedAt: new Date('2024-01-18T11:30:00'),
-      uploader: 'researcher.sui',
-    }
-  ]);
+  const [decryptedHistory, setDecryptedHistory] = useState<DecryptedDocument[]>([]); // Only real decrypted data
+  const [decryptionProgress, setDecryptionProgress] = useState<string>('');
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const handleDecrypt = async () => {
-    if (!blobId && !selectedDocument) {
-      setNotification({ type: 'error', message: 'Please enter a blob ID or select a document' });
+    if (!currentAccount) {
+      setNotification({ type: 'error', message: 'Please connect your wallet first' });
+      return;
+    }
+
+    if (!blobId.trim()) {
+      setNotification({ type: 'error', message: 'Please enter a blob ID' });
       return;
     }
 
     setDecrypting(true);
+    setDecryptionProgress('');
+    setCurrentDocument(null);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('🔓 Starting real decryption for blob:', blobId);
       
-      const targetBlobId = selectedDocument ? selectedDocument.blobId : blobId;
-      const docName = selectedDocument ? selectedDocument.name : 'unknown_document.pdf';
-      const uploader = selectedDocument ? selectedDocument.uploader : 'unknown.sui';
+      const result: SimpleBlobDecryption = await documentDecryptionService.decryptSingleBlob(
+        blobId,
+        currentAccount.address,
+        (progress) => setDecryptionProgress(progress)
+      );
       
-      const decryptedDoc: DecryptedDocument = {
-        id: Math.random().toString(36).substr(2, 9),
-        name: docName,
-        type: docName.endsWith('.pdf') ? 'application/pdf' : docName.endsWith('.png') ? 'image/png' : 'application/octet-stream',
-        size: Math.floor(Math.random() * 5000000) + 500000,
-        blobId: targetBlobId,
-        decryptedAt: new Date(),
-        uploader,
-        status: 'decrypted',
-        content: 'This is the decrypted content of the document. In a real implementation, this would contain the actual decrypted file content.'
-      };
+      if (result.decryptedImageUrl) {
+        const decryptedDoc: DecryptedDocument = {
+          id: Math.random().toString(36).substr(2, 9),
+          name: `decrypted_image_${blobId.slice(-6)}.jpg`,
+          type: 'image/jpeg',
+          size: 0, // Size unknown for now
+          blobId: blobId,
+          decryptedAt: new Date(),
+          status: 'decrypted',
+          imageUrl: result.decryptedImageUrl
+        };
 
-      setCurrentDocument(decryptedDoc);
-      setDecryptedHistory(prev => [decryptedDoc, ...prev]);
-      setNotification({ type: 'success', message: 'Document decrypted successfully' });
+        setCurrentDocument(decryptedDoc);
+        setDecryptedHistory(prev => [decryptedDoc, ...prev]);
+        setNotification({ type: 'success', message: 'Image retrieved and decrypted successfully!' });
+        console.log('✅ Decryption successful:', decryptedDoc);
+        
+      } else {
+        const failedDoc: DecryptedDocument = {
+          id: Math.random().toString(36).substr(2, 9),
+          name: `failed_${blobId.slice(-6)}`,
+          type: 'unknown',
+          size: 0,
+          blobId: blobId,
+          decryptedAt: new Date(),
+          status: 'failed',
+          error: result.error || 'Unknown error'
+        };
+        
+        setCurrentDocument(failedDoc);
+        setDecryptedHistory(prev => [failedDoc, ...prev]);
+        setNotification({ type: 'error', message: `Failed to decrypt: ${result.error}` });
+        console.error('❌ Decryption failed:', result.error);
+      }
       
     } catch (error) {
-      setNotification({ type: 'error', message: 'Failed to decrypt document' });
+      console.error('❌ Decryption error:', error);
+      setNotification({ 
+        type: 'error', 
+        message: `Decryption failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      });
     } finally {
       setDecrypting(false);
+      setDecryptionProgress('');
     }
 
     setTimeout(() => setNotification(null), 5000);
@@ -193,6 +184,35 @@ const GovtPage: React.FC = () => {
               </motion.div>
             )}
 
+            {/* Wallet Connection Check */}
+            {!currentAccount && (
+              <div className="mb-8 p-8 bg-yellow-50 border border-yellow-200 rounded-2xl">
+                <div className="flex items-center space-x-4">
+                  <Wallet className="w-8 h-8 text-yellow-600" />
+                  <div className="flex-1">
+                    <h3 className="font-clash font-semibold text-yellow-800 text-lg">
+                      Government Wallet Connection Required
+                    </h3>
+                    <p className="text-yellow-700 font-clash font-light mt-2">
+                      Please connect your authorized government wallet using the Connect Wallet button in the navigation bar to access and decrypt patent documents.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentAccount && (
+              <div className="mb-8 p-6 bg-green-50 border border-green-200 rounded-2xl">
+                <div className="flex items-center space-x-3">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <div>
+                    <p className="font-clash font-medium text-green-800">Government Wallet Connected</p>
+                    <p className="text-sm text-green-700 font-mono mt-1">{currentAccount.address}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Document Selection */}
               <div>
@@ -226,45 +246,24 @@ const GovtPage: React.FC = () => {
 
                       <div className="text-center text-gray-500 font-clash font-light">— OR —</div>
 
-                      <div>
-                        <label className="block text-sm font-clash font-medium text-gray-700 mb-4">
-                          Select from Uploaded Documents
-                        </label>
-                        <div className="space-y-3 max-h-48 overflow-y-auto">
-                          {uploadedDocuments.map((doc) => (
-                            <div
-                              key={doc.id}
-                              onClick={() => {
-                                setSelectedDocument(doc);
-                                setBlobId('');
-                              }}
-                              className={`p-4 border rounded-xl cursor-pointer transition-all duration-300 ${
-                                selectedDocument?.id === doc.id
-                                  ? 'border-[#4da2ff] bg-[#4da2ff]/5'
-                                  : 'border-gray-200 hover:border-[#4da2ff]/50 hover:bg-gray-50'
-                              }`}
-                            >
-                              <div className="flex items-center space-x-3">
-                                <FileText className="w-4 h-4 text-gray-600" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-clash font-medium text-gray-900 truncate">
-                                    {doc.name}
-                                  </p>
-                                  <p className="text-xs text-gray-600 font-clash">
-                                    {doc.uploader} • {doc.uploadedAt.toLocaleDateString()}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                      <div className="mb-6">
+                        <p className="text-sm text-gray-600 font-clash">
+                          Enter the blob ID of the encrypted document you want to decrypt.
+                        </p>
                       </div>
+
+                      {/* Progress indicator */}
+                      {decryptionProgress && (
+                        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-sm text-blue-800 font-clash">{decryptionProgress}</p>
+                        </div>
+                      )}
 
                       <button
                         onClick={handleDecrypt}
-                        disabled={decrypting || (!blobId && !selectedDocument)}
+                        disabled={decrypting || !blobId.trim()}
                         className={`w-full py-4 px-6 rounded-2xl text-white font-clash font-medium transition-all duration-300 flex items-center justify-center space-x-2 ${
-                          decrypting || (!blobId && !selectedDocument)
+                          decrypting || !blobId.trim()
                             ? "bg-gray-400 cursor-not-allowed"
                             : "bg-[#4da2ff] hover:bg-[#3d91ef] shadow-lg hover:shadow-xl hover:shadow-[#4da2ff]/25"
                         }`}
@@ -334,8 +333,8 @@ const GovtPage: React.FC = () => {
                               <p className="text-gray-600 mt-1 font-clash">{formatFileSize(currentDocument.size)}</p>
                             </div>
                             <div>
-                              <span className="font-clash font-medium text-gray-700">Uploader:</span>
-                              <p className="text-gray-600 mt-1 font-clash">{currentDocument.uploader}</p>
+                              <span className="font-clash font-medium text-gray-700">Status:</span>
+                              <p className="text-gray-600 mt-1 font-clash capitalize">{currentDocument.status}</p>
                             </div>
                             <div>
                               <span className="font-clash font-medium text-gray-700">Decrypted:</span>
@@ -375,13 +374,34 @@ const GovtPage: React.FC = () => {
 
                           {currentDocument.type.startsWith('image/') && (
                             <div className="text-center">
-                              <Image className="mx-auto w-16 h-16 text-gray-400 mb-6" />
-                              <p className="text-gray-600 mb-6 font-clash font-medium">Image Document Preview</p>
-                              <div className="bg-white p-6 rounded-xl shadow-sm max-w-lg mx-auto border border-gray-100">
-                                <div className="w-full h-64 bg-gradient-to-br from-gray-200 to-gray-300 rounded-xl flex items-center justify-center">
-                                  <span className="text-gray-500 font-clash">Image content would display here</span>
-                                </div>
-                              </div>
+                              {currentDocument.imageUrl ? (
+                                <>
+                                  <p className="text-gray-600 mb-6 font-clash font-medium">Decrypted Image Preview</p>
+                                  <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 inline-block">
+                                    <img 
+                                      src={currentDocument.imageUrl} 
+                                      alt="Decrypted document" 
+                                      className="max-w-full max-h-96 rounded-lg shadow-sm"
+                                      style={{ maxHeight: '400px', maxWidth: '100%' }}
+                                    />
+                                  </div>
+                                  <div className="mt-4 p-4 bg-green-50 rounded-xl border border-green-200 max-w-2xl mx-auto">
+                                    <p className="text-sm text-green-800 font-clash">
+                                      ✅ Image successfully retrieved and decrypted from Walrus storage
+                                    </p>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <Image className="mx-auto w-16 h-16 text-gray-400 mb-6" />
+                                  <p className="text-gray-600 mb-6 font-clash font-medium">Image Document Preview</p>
+                                  <div className="bg-red-50 p-4 rounded-xl border border-red-200 max-w-2xl mx-auto">
+                                    <p className="text-sm text-red-800 font-clash">
+                                      ❌ Failed to decrypt image: {currentDocument.error || 'Unknown error'}
+                                    </p>
+                                  </div>
+                                </>
+                              )}
                             </div>
                           )}
 
@@ -474,8 +494,13 @@ const GovtPage: React.FC = () => {
                               </td>
                               <td className="px-8 py-6 whitespace-nowrap">
                                 <div className="flex items-center space-x-2">
-                                  <User className="w-4 h-4 text-gray-500" />
-                                  <span className="text-sm text-gray-600 font-clash">{doc.uploader}</span>
+                                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                    doc.status === 'decrypted' 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : 'bg-red-100 text-red-800'
+                                  }`}>
+                                    {doc.status}
+                                  </span>
                                 </div>
                               </td>
                               <td className="px-8 py-6 whitespace-nowrap">
