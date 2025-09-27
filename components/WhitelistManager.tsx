@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
-import { useCurrentAccount, ConnectButton } from '@mysten/dapp-kit';
+import React, { useState, useCallback, useEffect } from 'react';
+import { useCurrentAccount, ConnectButton, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
+import { Transaction } from '@mysten/sui/transactions';
 import { 
   UserPlus, 
   UserMinus, 
@@ -24,6 +25,8 @@ const CONTRACT_CONFIG = {
 
 export default function WhitelistManager() {
   const currentAccount = useCurrentAccount();
+  const suiClient = useSuiClient();
+  const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction();
   
   const [addressToAdd, setAddressToAdd] = useState('');
   const [addressToRemove, setAddressToRemove] = useState('');
@@ -31,6 +34,45 @@ export default function WhitelistManager() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [adminAddress, setAdminAddress] = useState<string>('');
+
+  // Check if current user is admin
+  useEffect(() => {
+    async function checkAdminStatus() {
+      if (!currentAccount || !suiClient) {
+        setIsAdmin(false);
+        setAdminAddress('');
+        return;
+      }
+
+      try {
+        // Get the AdminCap object to find who owns it
+        const adminCapObject = await suiClient.getObject({
+          id: CONTRACT_CONFIG.adminCapId,
+          options: {
+            showOwner: true,
+            showType: true
+          }
+        });
+
+        if (adminCapObject.data?.owner && typeof adminCapObject.data.owner === 'object' && 'AddressOwner' in adminCapObject.data.owner) {
+          const ownerAddress = adminCapObject.data.owner.AddressOwner;
+          setAdminAddress(ownerAddress);
+          setIsAdmin(currentAccount.address === ownerAddress);
+        } else {
+          setIsAdmin(false);
+          setAdminAddress('');
+        }
+      } catch (err) {
+        console.error('Error checking admin status:', err);
+        setIsAdmin(false);
+        setAdminAddress('');
+      }
+    }
+
+    checkAdminStatus();
+  }, [currentAccount, suiClient]);
 
   // Clear messages
   const clearMessages = useCallback(() => {
@@ -38,25 +80,37 @@ export default function WhitelistManager() {
     setError('');
   }, []);
 
-  // Call backend whitelist API
-  const callWhitelistAPI = async (action: 'add' | 'remove', address: string) => {
-    const response = await fetch('http://localhost:3001/whitelist', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        encryption_id: CONTRACT_CONFIG.whitelistObjectId,
-        wallet_address: address,
-        action: action
-      }),
+  // Execute blockchain transaction for whitelist operations
+  const executeWhitelistTransaction = (functionName: string, addressToModify: string): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      const tx = new Transaction();
+      
+      tx.moveCall({
+        target: `${CONTRACT_CONFIG.packageId}::simple_whitelist::${functionName}`,
+        arguments: [
+          tx.object(CONTRACT_CONFIG.whitelistObjectId),
+          tx.object(CONTRACT_CONFIG.adminCapId),
+          tx.pure.address(addressToModify)
+        ],
+      });
+
+      console.log(`🔧 Executing ${functionName} transaction for address:`, addressToModify);
+      console.log('🔧 Target:', `${CONTRACT_CONFIG.packageId}::simple_whitelist::${functionName}`);
+
+      signAndExecuteTransaction(
+        { transaction: tx as any }, // Type assertion to resolve compatibility
+        {
+          onSuccess: (result) => {
+            console.log('✅ Transaction successful:', result);
+            resolve(result);
+          },
+          onError: (error) => {
+            console.error('❌ Transaction failed:', error);
+            reject(error);
+          }
+        }
+      );
     });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return await response.json();
   };
 
   // Add address to whitelist
@@ -76,14 +130,10 @@ export default function WhitelistManager() {
     try {
       console.log('Adding address to whitelist:', addressToAdd);
       
-      const response = await callWhitelistAPI('add', addressToAdd.trim());
+      const result = await executeWhitelistTransaction('add_address', addressToAdd.trim());
       
-      if (response.success) {
-        setResult(`✅ Successfully added ${addressToAdd} to whitelist!`);
-        setAddressToAdd('');
-      } else {
-        setError(`Failed to add address: ${response.error}`);
-      }
+      setResult(`✅ Successfully added ${addressToAdd} to whitelist! TX: ${result.digest}`);
+      setAddressToAdd('');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(`Add operation failed: ${errorMessage}`);
@@ -109,14 +159,10 @@ export default function WhitelistManager() {
     try {
       console.log('Removing address from whitelist:', addressToRemove);
       
-      const response = await callWhitelistAPI('remove', addressToRemove.trim());
+      const result = await executeWhitelistTransaction('remove_address', addressToRemove.trim());
       
-      if (response.success) {
-        setResult(`✅ Successfully removed ${addressToRemove} from whitelist!`);
-        setAddressToRemove('');
-      } else {
-        setError(`Failed to remove address: ${response.error}`);
-      }
+      setResult(`✅ Successfully removed ${addressToRemove} from whitelist! TX: ${result.digest}`);
+      setAddressToRemove('');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(`Remove operation failed: ${errorMessage}`);
@@ -138,14 +184,28 @@ export default function WhitelistManager() {
     try {
       console.log('Checking whitelist status for:', addressToCheck);
       
-      const response = await fetch(`http://localhost:3001/whitelist/${CONTRACT_CONFIG.whitelistObjectId}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        const isWhitelisted = data.data.whitelist.includes(addressToCheck.trim());
+      // Query the blockchain to check whitelist status
+      const tx = new Transaction();
+      tx.moveCall({
+        target: `${CONTRACT_CONFIG.packageId}::simple_whitelist::is_whitelisted`,
+        arguments: [
+          tx.object(CONTRACT_CONFIG.whitelistObjectId),
+          tx.pure.address(addressToCheck.trim())
+        ],
+      });
+
+      const result = await suiClient.devInspectTransactionBlock({
+        transactionBlock: tx as any, // Type assertion to resolve compatibility
+        sender: currentAccount?.address || addressToCheck.trim(),
+      });
+
+      if (result.results && result.results[0]?.returnValues) {
+        const returnValue = result.results[0].returnValues[0];
+        const isWhitelisted = returnValue && returnValue[0] && returnValue[0][0] === 1;
+        
         setResult(`📋 Address ${addressToCheck} is ${isWhitelisted ? 'WHITELISTED' : 'NOT WHITELISTED'}`);
       } else {
-        setError(`Failed to check status: ${data.error}`);
+        setError('Unable to determine whitelist status');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -177,18 +237,38 @@ export default function WhitelistManager() {
         </div>
       </div>
 
-      {/* Wallet Status */}
+      {/* Admin Status */}
       <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
         <div className="flex items-center gap-3">
           <Key className="w-5 h-5 text-blue-600" />
-          <div>
+          <div className="flex-1">
             <h3 className="font-semibold text-blue-900">Admin Status</h3>
             {currentAccount ? (
-              <p className="text-sm text-blue-700">
-                Connected as: {currentAccount.address.slice(0, 10)}...{currentAccount.address.slice(-8)}
-              </p>
+              <div className="space-y-1">
+                <p className="text-sm text-blue-700">
+                  Connected as: <code className="bg-blue-100 px-1 rounded text-xs">{currentAccount.address.slice(0, 20)}...{currentAccount.address.slice(-10)}</code>
+                </p>
+                {adminAddress && (
+                  <p className="text-sm text-blue-700">
+                    Admin address: <code className="bg-blue-100 px-1 rounded text-xs">{adminAddress.slice(0, 20)}...{adminAddress.slice(-10)}</code>
+                  </p>
+                )}
+                <div className="flex items-center gap-2 mt-2">
+                  {isAdmin ? (
+                    <>
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <span className="text-sm font-medium text-green-700">You are the admin</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="w-4 h-4 text-amber-600" />
+                      <span className="text-sm font-medium text-amber-700">You are not the admin</span>
+                    </>
+                  )}
+                </div>
+              </div>
             ) : (
-              <p className="text-sm text-blue-700">Please connect your wallet to manage whitelist</p>
+              <p className="text-sm text-blue-700">Please connect your wallet to check admin status</p>
             )}
           </div>
         </div>
@@ -208,57 +288,75 @@ export default function WhitelistManager() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Add Address */}
-        <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <UserPlus className="w-5 h-5 text-green-600" />
-            Add Address
-          </h3>
-          <div className="space-y-4">
-            <input
-              type="text"
-              value={addressToAdd}
-              onChange={(e) => setAddressToAdd(e.target.value)}
-              placeholder="0x... (address to whitelist)"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
-              disabled={isLoading}
-            />
-            <button
-              onClick={handleAddAddress}
-              disabled={isLoading || !currentAccount || !addressToAdd.trim()}
-              className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium"
-            >
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <UserPlus className="w-4 h-4" />
-              )}
-              Add to Whitelist
-            </button>
+      {/* Non-admin notice */}
+      {currentAccount && !isAdmin && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600" />
+            <div>
+              <h3 className="font-semibold text-amber-900">Admin Access Required</h3>
+              <p className="text-sm text-amber-700">
+                Only the admin can add or remove addresses from the whitelist. You can still check if addresses are whitelisted.
+              </p>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Remove Address */}
-        <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <UserMinus className="w-5 h-5 text-red-600" />
-            Remove Address
-          </h3>
-          <div className="space-y-4">
-            <input
-              type="text"
-              value={addressToRemove}
-              onChange={(e) => setAddressToRemove(e.target.value)}
-              placeholder="0x... (address to remove)"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
-              disabled={isLoading}
-            />
-            <button
-              onClick={handleRemoveAddress}
-              disabled={isLoading || !currentAccount || !addressToRemove.trim()}
-              className="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium"
-            >
+      <div className={`grid grid-cols-1 ${isAdmin ? 'lg:grid-cols-3' : 'lg:grid-cols-1'} gap-6`}>
+        {/* Add Address - Admin Only */}
+        {isAdmin && (
+          <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-green-600" />
+              Add Address
+            </h3>
+            <div className="space-y-4">
+              <input
+                type="text"
+                value={addressToAdd}
+                onChange={(e) => setAddressToAdd(e.target.value)}
+                placeholder="0x... (address to whitelist)"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                disabled={isLoading}
+              />
+              <button
+                onClick={handleAddAddress}
+                disabled={isLoading || !currentAccount || !addressToAdd.trim()}
+                className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <UserPlus className="w-4 h-4" />
+                )}
+                Add to Whitelist
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Remove Address - Admin Only */}
+        {isAdmin && (
+          <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <UserMinus className="w-5 h-5 text-red-600" />
+              Remove Address
+            </h3>
+            <div className="space-y-4">
+              <input
+                type="text"
+                value={addressToRemove}
+                onChange={(e) => setAddressToRemove(e.target.value)}
+                placeholder="0x... (address to remove)"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+                disabled={isLoading}
+              />
+              <button
+                onClick={handleRemoveAddress}
+                disabled={isLoading || !currentAccount || !addressToRemove.trim()}
+                className="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium"
+              >
               {isLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
@@ -268,6 +366,7 @@ export default function WhitelistManager() {
             </button>
           </div>
         </div>
+        )}
 
         {/* Check Status */}
         <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">

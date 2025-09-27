@@ -4,6 +4,7 @@ import React, { useState, useCallback } from 'react';
 import { useCurrentAccount, ConnectButton } from '@mysten/dapp-kit';
 import { Upload, Download, WalletIcon, Image as ImageIcon, Loader2, CheckCircle, AlertCircle, Lock, X } from 'lucide-react';
 import { WalrusService, EncryptionResult } from '../lib/walrusService';
+import { decryptionService, DecryptionResult } from '../lib/decryptionService';
 import '@mysten/dapp-kit/dist/index.css';
 
 const walrusService = new WalrusService(5); // Store for 5 epochs
@@ -17,6 +18,8 @@ export default function WalrusImageDemo() {
   const [retrieveEncryptionId, setRetrieveEncryptionId] = useState('');
   const [isRetrieving, setIsRetrieving] = useState(false);
   const [retrievedImageUrl, setRetrievedImageUrl] = useState('');
+  const [decryptionProgress, setDecryptionProgress] = useState('');
+  const [decryptionResult, setDecryptionResult] = useState<DecryptionResult | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -119,17 +122,35 @@ export default function WalrusImageDemo() {
     setError('');
     setRetrievedImageUrl('');
     setSuccess('');
+    setDecryptionResult(null);
+    setDecryptionProgress('');
 
     try {
       console.log('🔍 Retrieving image from Walrus...', { blobId: retrieveBlobId });
       if (retrieveEncryptionId.trim()) {
-        // Encrypted image retrieval
-        console.log('🔐 Decrypting with encryption ID:', retrieveEncryptionId);
-        const decryptedBlob = await walrusService.retrieveImage(retrieveBlobId, retrieveEncryptionId);
-        const dataUrl = await walrusService.blobToDataUrl(decryptedBlob);
-        setRetrievedImageUrl(dataUrl);
-        setSuccess('🎉 Image retrieved and decrypted successfully!');
-        console.log('✅ Decrypted image retrieved:', dataUrl);
+        // Encrypted image retrieval with whitelist check
+        if (!currentAccount) {
+          setError('Please connect your wallet to decrypt encrypted images');
+          return;
+        }
+
+        console.log('🔐 Attempting decryption with encryption ID:', retrieveEncryptionId);
+        
+        const result = await decryptionService.decryptBlob(
+          retrieveBlobId,
+          retrieveEncryptionId,
+          currentAccount.address,
+          (progress) => setDecryptionProgress(progress)
+        );
+
+        setDecryptionResult(result);
+
+        if (result.success && result.decryptedUrl) {
+          setRetrievedImageUrl(result.decryptedUrl);
+          setSuccess('🎉 Encrypted blob processed successfully! (Note: Full decryption requires session key)');
+        } else {
+          setError(`Decryption failed: ${result.error}`);
+        }
       } else {
         // Plain image retrieval
         const imageUrl = walrusService.getBlobUrl(retrieveBlobId);
@@ -143,8 +164,9 @@ export default function WalrusImageDemo() {
       console.error('❌ Retrieval error:', err);
     } finally {
       setIsRetrieving(false);
+      setDecryptionProgress('');
     }
-  }, [retrieveBlobId, retrieveEncryptionId]);
+  }, [retrieveBlobId, retrieveEncryptionId, currentAccount]);
 
   // Clear form state
   const handleClear = useCallback(() => {
@@ -153,6 +175,8 @@ export default function WalrusImageDemo() {
     setRetrieveBlobId('');
     setRetrieveEncryptionId('');
     setRetrievedImageUrl('');
+    setDecryptionProgress('');
+    setDecryptionResult(null);
     setError('');
     setSuccess('');
   }, []);
@@ -200,6 +224,30 @@ export default function WalrusImageDemo() {
         <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
           <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
           <p className="text-green-800">{success}</p>
+        </div>
+      )}
+      
+      {/* Decryption Progress */}
+      {decryptionProgress && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+          <Loader2 className="w-5 h-5 text-blue-600 animate-spin flex-shrink-0" />
+          <p className="text-blue-800">{decryptionProgress}</p>
+        </div>
+      )}
+
+      {/* Decryption Result Info */}
+      {decryptionResult && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <h3 className="font-semibold text-yellow-900 mb-2">Decryption Status</h3>
+          <div className="text-sm text-yellow-700 space-y-1">
+            <div><strong>Status:</strong> {decryptionResult.success ? 'Partial Success' : 'Failed'}</div>
+            {decryptionResult.decryptedData && (
+              <div><strong>Data Size:</strong> {decryptionResult.decryptedData.length} bytes</div>
+            )}
+            {decryptionResult.error && (
+              <div><strong>Note:</strong> {decryptionResult.error}</div>
+            )}
+          </div>
         </div>
       )}
 

@@ -7,17 +7,7 @@ import { SuiClient } from '@mysten/sui/client';
 import { SealClient } from '@mysten/seal';
 import { fromHex, toHex } from '@mysten/sui/utils';
 
-export interface Wa  /**
-   * Store an encrypted image file on Walrus with whitelist integration
-   */
-  async storeImage(file: File, userAddress?: string): Promise<EncryptionResult> {
-    try {
-      console.log('🔐 Starting encrypted image storage process...');
-      console.log('📄 File:', file.name, file.size, 'bytes');
-      
-      if (userAddress) {
-        console.log('👤 User Address:', userAddress);
-      }sponse {
+export interface WalrusStoreResponse {
   newlyCreated?: {
     blobObject: {
       id: string;
