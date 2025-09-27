@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { Menu, X, Wallet } from "lucide-react";
+import { useCurrentAccount, ConnectButton } from '@mysten/dapp-kit';
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -12,6 +13,7 @@ const Navbar: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
   const { scrollY } = useScroll();
+  const currentAccount = useCurrentAccount();
 
   // Track scroll position for navbar styling
   useEffect(() => {
@@ -91,17 +93,25 @@ const Navbar: React.FC = () => {
             ))}
 
             {/* Connect Wallet Button */}
-            <motion.button
+            <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4, delay: 0.5 }}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="ml-8 flex items-center space-x-2 bg-[#4da2ff] hover:bg-[#3d91ef] text-white px-6 py-3 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-[#4da2ff]/25 font-clash font-medium"
+              className="ml-8"
             >
-              <Wallet size={18} />
-              <span>Connect Wallet</span>
-            </motion.button>
+              {currentAccount ? (
+                <div className="flex items-center space-x-3 bg-green-50 border border-green-200 px-4 py-2.5 rounded-2xl">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="font-clash font-medium text-green-800 text-sm">
+                    {currentAccount.address.slice(0, 6)}...{currentAccount.address.slice(-4)}
+                  </span>
+                </div>
+              ) : (
+                <ConnectButton className="flex items-center space-x-2 bg-[#4da2ff] hover:bg-[#3d91ef] text-white px-6 py-3 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-[#4da2ff]/25 font-clash font-medium" />
+              )}
+            </motion.div>
           </div>
 
           {/* Mobile menu button */}
@@ -148,16 +158,23 @@ const Navbar: React.FC = () => {
           ))}
 
           {/* Mobile Connect Button */}
-          <motion.button
+          <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: isOpen ? 1 : 0, x: isOpen ? 0 : -20 }}
             transition={{ duration: 0.3, delay: navigation.length * 0.05 }}
-            className="w-full flex items-center justify-center space-x-2 bg-[#4da2ff] hover:bg-[#3d91ef] text-white px-5 py-3.5 rounded-2xl transition-all duration-300 mt-6 font-clash font-medium shadow-lg hover:shadow-xl hover:shadow-[#4da2ff]/25"
-            onClick={() => setIsOpen(false)}
+            className="mt-6"
           >
-            <Wallet size={18} />
-            <span>Connect Wallet</span>
-          </motion.button>
+            {currentAccount ? (
+              <div className="w-full flex items-center justify-center space-x-3 bg-green-50 border border-green-200 px-5 py-3.5 rounded-2xl">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="font-clash font-medium text-green-800">
+                  {currentAccount.address.slice(0, 8)}...{currentAccount.address.slice(-6)}
+                </span>
+              </div>
+            ) : (
+              <ConnectButton className="w-full flex items-center justify-center space-x-2 bg-[#4da2ff] hover:bg-[#3d91ef] text-white px-5 py-3.5 rounded-2xl transition-all duration-300 font-clash font-medium shadow-lg hover:shadow-xl hover:shadow-[#4da2ff]/25" />
+            )}
+          </motion.div>
         </div>
       </motion.div>
     </motion.nav>

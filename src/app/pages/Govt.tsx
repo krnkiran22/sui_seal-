@@ -17,7 +17,7 @@ import {
   CheckCircle,
   Wallet
 } from 'lucide-react';
-import { useCurrentAccount } from '@mysten/dapp-kit';
+import { useCurrentAccount, ConnectButton } from '@mysten/dapp-kit';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import Table from '../components/Table';
@@ -187,16 +187,19 @@ const GovtPage: React.FC = () => {
             {/* Wallet Connection Check */}
             {!currentAccount && (
               <div className="mb-8 p-8 bg-yellow-50 border border-yellow-200 rounded-2xl">
-                <div className="flex items-center space-x-4">
-                  <Wallet className="w-8 h-8 text-yellow-600" />
-                  <div className="flex-1">
-                    <h3 className="font-clash font-semibold text-yellow-800 text-lg">
-                      Government Wallet Connection Required
-                    </h3>
-                    <p className="text-yellow-700 font-clash font-light mt-2">
-                      Please connect your authorized government wallet using the Connect Wallet button in the navigation bar to access and decrypt patent documents.
-                    </p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <Wallet className="w-8 h-8 text-yellow-600" />
+                    <div className="flex-1">
+                      <h3 className="font-clash font-semibold text-yellow-800 text-lg">
+                        Government Wallet Connection Required
+                      </h3>
+                      <p className="text-yellow-700 font-clash font-light mt-2">
+                        Connect your authorized government wallet to access and decrypt patent documents.
+                      </p>
+                    </div>
                   </div>
+                  <ConnectButton />
                 </div>
               </div>
             )}
