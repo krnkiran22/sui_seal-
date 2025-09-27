@@ -15,6 +15,9 @@ import {
   Trash2,
   WalletIcon
 } from 'lucide-react';
+import { AddressDisplay } from './AddressDisplay';
+import { TransactionResult } from './TransactionResult';
+import { WhitelistStatus } from './WhitelistStatus';
 
 // Contract configuration from deployment
 const CONTRACT_CONFIG = {
@@ -36,6 +39,15 @@ export default function WhitelistManager() {
   const [error, setError] = useState<string>('');
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [adminAddress, setAdminAddress] = useState<string>('');
+  const [transactionResult, setTransactionResult] = useState<{
+    type: 'add' | 'remove';
+    address: string;
+    txHash: string;
+  } | null>(null);
+  const [whitelistStatus, setWhitelistStatus] = useState<{
+    address: string;
+    isWhitelisted: boolean;
+  } | null>(null);
 
   // Check if current user is admin
   useEffect(() => {
@@ -78,6 +90,8 @@ export default function WhitelistManager() {
   const clearMessages = useCallback(() => {
     setResult('');
     setError('');
+    setTransactionResult(null);
+    setWhitelistStatus(null);
   }, []);
 
   // Execute blockchain transaction for whitelist operations
@@ -132,7 +146,11 @@ export default function WhitelistManager() {
       
       const result = await executeWhitelistTransaction('add_address', addressToAdd.trim());
       
-      setResult(`✅ Successfully added ${addressToAdd} to whitelist! TX: ${result.digest}`);
+      setTransactionResult({
+        type: 'add',
+        address: addressToAdd,
+        txHash: result.digest
+      });
       setAddressToAdd('');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -161,7 +179,11 @@ export default function WhitelistManager() {
       
       const result = await executeWhitelistTransaction('remove_address', addressToRemove.trim());
       
-      setResult(`✅ Successfully removed ${addressToRemove} from whitelist! TX: ${result.digest}`);
+      setTransactionResult({
+        type: 'remove',
+        address: addressToRemove,
+        txHash: result.digest
+      });
       setAddressToRemove('');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -203,7 +225,10 @@ export default function WhitelistManager() {
         const returnValue = result.results[0].returnValues[0];
         const isWhitelisted = returnValue && returnValue[0] && returnValue[0][0] === 1;
         
-        setResult(`📋 Address ${addressToCheck} is ${isWhitelisted ? 'WHITELISTED' : 'NOT WHITELISTED'}`);
+        setWhitelistStatus({
+          address: addressToCheck.trim(),
+          isWhitelisted: isWhitelisted
+        });
       } else {
         setError('Unable to determine whitelist status');
       }
@@ -244,14 +269,24 @@ export default function WhitelistManager() {
           <div className="flex-1">
             <h3 className="font-semibold text-blue-900">Admin Status</h3>
             {currentAccount ? (
-              <div className="space-y-1">
-                <p className="text-sm text-blue-700">
-                  Connected as: <code className="bg-blue-100 px-1 rounded text-xs">{currentAccount.address.slice(0, 20)}...{currentAccount.address.slice(-10)}</code>
-                </p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-blue-700">Connected as:</span>
+                  <AddressDisplay 
+                    address={currentAccount.address} 
+                    className="bg-blue-100 rounded text-xs"
+                    showIcon={false}
+                  />
+                </div>
                 {adminAddress && (
-                  <p className="text-sm text-blue-700">
-                    Admin address: <code className="bg-blue-100 px-1 rounded text-xs">{adminAddress.slice(0, 20)}...{adminAddress.slice(-10)}</code>
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-blue-700">Admin address:</span>
+                    <AddressDisplay 
+                      address={adminAddress} 
+                      className="bg-blue-100 rounded text-xs"
+                      showIcon={false}
+                    />
+                  </div>
                 )}
                 <div className="flex items-center gap-2 mt-2">
                   {isAdmin ? (
@@ -279,6 +314,23 @@ export default function WhitelistManager() {
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
           <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
           <p className="text-red-800">{error}</p>
+        </div>
+      )}
+      {transactionResult && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <TransactionResult
+            type={transactionResult.type}
+            address={transactionResult.address}
+            txHash={transactionResult.txHash}
+          />
+        </div>
+      )}
+      {whitelistStatus && (
+        <div className={`mb-6 p-4 rounded-lg border ${whitelistStatus.isWhitelisted ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+          <WhitelistStatus
+            address={whitelistStatus.address}
+            isWhitelisted={whitelistStatus.isWhitelisted}
+          />
         </div>
       )}
       {result && (
