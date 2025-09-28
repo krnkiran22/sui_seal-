@@ -56,7 +56,7 @@ const Navbar: React.FC = () => {
             >
               <img 
                 src="/cropimage.png" 
-                alt="SuiSeal Logo"
+                alt="SuiPatent Logo"
                 className="w-12 h-12 rounded-lg shadow-lg group-hover:shadow-xl transition-all duration-300 object-cover"
                 onError={(e) => {
                   // Fallback to SVG if PNG is not available
@@ -65,7 +65,7 @@ const Navbar: React.FC = () => {
               />
             </motion.div>
             <span className="font-clash font-semibold text-2xl text-gray-900 tracking-tight">
-              SuiSeal
+              SuiPatent
             </span>
           </Link>
 

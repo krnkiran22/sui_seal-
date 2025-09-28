@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 export default function Home() {
   const [scrollDirection, setScrollDirection] = useState("down");
@@ -172,10 +173,14 @@ export default function Home() {
                 {/* Main Card */}
                 <div className="bg-white rounded-3xl shadow-2xl p-8 border border-gray-100 relative z-10">
                   <div className="flex items-center justify-between mb-6">
-                    <div className="w-12 h-12 bg-[#4da2ff] rounded-xl flex items-center justify-center">
-                      <span className="text-white font-clash font-semibold text-lg">
-                        S
-                      </span>
+                    <div className="w-12 h-12 bg-[#4da2ff] rounded-xl flex items-center justify-center p-2">
+                      <Image
+                        src="/cropimage.png"
+                        alt="SuiPatent Logo"
+                        width={32}
+                        height={32}
+                        className="rounded-lg"
+                      />
                     </div>
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 bg-[#4da2ff] rounded-full animate-pulse"></div>
@@ -277,7 +282,13 @@ export default function Home() {
                   <div className="absolute top-0 right-0 w-20 h-20 bg-[#4da2ff]/5 rounded-full blur-2xl group-hover:bg-[#4da2ff]/10 transition-all duration-500"></div>
                   <div className="relative z-10">
                     <div className="w-12 h-12 bg-[#4da2ff]/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#4da2ff]/20 transition-all duration-300">
-                      <div className="w-6 h-6 bg-[#4da2ff] rounded-lg"></div>
+                      <Image
+                        src="/cropimage.png"
+                        alt="SuiPatent Logo"
+                        width={24}
+                        height={24}
+                        className="rounded-md"
+                      />
                     </div>
                     <h3 className="text-xl font-clash font-medium text-gray-900 mb-4">
                       {feature.title}

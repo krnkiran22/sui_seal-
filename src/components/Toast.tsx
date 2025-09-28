@@ -70,7 +70,7 @@ const ToastItem = ({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: 300, scale: 0.95 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className={`min-w-96 w-auto max-w-md ${bgColors[toast.type]} border rounded-xl shadow-lg p-5 backdrop-blur-sm`}
+      className={`min-w-80 w-auto max-w-sm ${bgColors[toast.type]} border rounded-xl shadow-lg p-4 backdrop-blur-sm`}
     >
       <div className="flex items-start space-x-4">
         <div className="flex-shrink-0 mt-0.5">
@@ -138,7 +138,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       {children}
       
       {/* Toast Container */}
-      <div className="fixed top-6 right-6 z-50 space-y-3 max-w-md">
+      <div className="fixed top-24 right-6 z-[60] space-y-3 max-w-md">
         <AnimatePresence mode="popLayout">
           {toasts.map((toast) => (
             <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
