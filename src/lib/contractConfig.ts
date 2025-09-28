@@ -19,5 +19,18 @@ export const MULTI_ADMIN_WHITELIST_CONFIG = {
   transactionHash: 'BSW67ehViuxS4svULQqesENaBKk9o6NrtE3kEqR2krWa'
 };
 
+// Document NFT Contract Configuration
+// Generated from deployment transaction: 9HqiH7cnpHRcwULCyfHir8jPstTM2BPj8EHEoaiZJaks
+export const DOCUMENT_NFT_CONFIG = {
+  packageId: '0x8e7ff481c57b84777c58f9003a7aabb90205f5329f547e8bd564adc52f91a387',
+  displayObjectId: '0xe5ce34fe0b1b407edd68444e86c4b12a93a5351deb1cab4c19306b846d04f0e5',
+  publisherObjectId: '0xe1521b79be308978cb400cf69c635498f60a6801315a3e001c56afbad7cc3bbc',
+  moduleName: 'document_nft',
+  functionName: 'mint_and_transfer_nft',
+  network: 'testnet',
+  transactionHash: '9HqiH7cnpHRcwULCyfHir8jPstTM2BPj8EHEoaiZJaks',
+  clockObjectId: '0x6', // Sui Clock object ID
+};
+
 // For backward compatibility with existing components
 export const CONTRACT_CONFIG = MULTI_ADMIN_WHITELIST_CONFIG;

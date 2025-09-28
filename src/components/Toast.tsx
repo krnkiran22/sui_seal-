@@ -66,28 +66,29 @@ const ToastItem = ({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -50, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -50, scale: 0.95 }}
-      className={`max-w-sm w-full ${bgColors[toast.type]} border rounded-xl shadow-lg p-4`}
+      initial={{ opacity: 0, x: 300, scale: 0.95 }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      exit={{ opacity: 0, x: 300, scale: 0.95 }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      className={`min-w-96 w-auto max-w-md ${bgColors[toast.type]} border rounded-xl shadow-lg p-5 backdrop-blur-sm`}
     >
-      <div className="flex items-start">
-        <div className="flex-shrink-0">
+      <div className="flex items-start space-x-4">
+        <div className="flex-shrink-0 mt-0.5">
           <ToastIcon type={toast.type} />
         </div>
-        <div className="ml-3 w-0 flex-1">
-          <p className={`text-sm font-medium ${textColors[toast.type]}`}>
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-semibold ${textColors[toast.type]} font-clash`}>
             {toast.title}
           </p>
           {toast.message && (
-            <p className={`mt-1 text-sm ${textColors[toast.type]} opacity-80`}>
+            <p className={`mt-2 text-sm ${textColors[toast.type]} opacity-90 font-clash font-light leading-relaxed`}>
               {toast.message}
             </p>
           )}
         </div>
-        <div className="ml-4 flex-shrink-0 flex">
+        <div className="flex-shrink-0">
           <button
-            className={`inline-flex ${textColors[toast.type]} hover:opacity-80 focus:outline-none`}
+            className={`inline-flex ${textColors[toast.type]} hover:opacity-70 focus:outline-none transition-opacity p-1 rounded-lg hover:bg-black/5`}
             onClick={() => onRemove(toast.id)}
           >
             <X className="w-4 h-4" />
@@ -137,8 +138,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       {children}
       
       {/* Toast Container */}
-      <div className="fixed top-4 right-4 z-50 space-y-2">
-        <AnimatePresence>
+      <div className="fixed top-6 right-6 z-50 space-y-3 max-w-md">
+        <AnimatePresence mode="popLayout">
           {toasts.map((toast) => (
             <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
           ))}

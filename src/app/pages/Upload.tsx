@@ -2,9 +2,12 @@
 
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, FileText, Image, Video, Trash2, CheckCircle, AlertCircle, Hash, Zap, Hexagon, Triangle, Layers, Wallet } from 'lucide-react';
-import { useCurrentAccount } from '@mysten/dapp-kit';
+import { Upload, FileText, Image, Video, Trash2, CheckCircle, AlertCircle, Hash, Zap, Hexagon, Triangle, Layers, Wallet, Award } from 'lucide-react';
+import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
 import { walrusService, EncryptionResult } from '../../lib/walrusService';
+import { documentNFTService, MintNFTParams } from '../../services/documentNFTService';
+import { useSuiNS } from '../../hooks/useSuiNS';
+import { useToast } from '../../components/Toast';
 
 interface UploadedFile {
   id: string;
@@ -13,14 +16,24 @@ interface UploadedFile {
   type: string;
   blobId: string;
   uploadedAt: Date;
+  nftId?: string;
+  nftMinted?: boolean;
 }
 
 const UploadPage: React.FC = () => {
   const currentAccount = useCurrentAccount();
+  const suiClient = useSuiClient();
+  const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction();
+  const { showSuccess, showError, showInfo } = useToast();
+  
+  // Get SuiNS name for current wallet
+  const { name: suiNSName } = useSuiNS(currentAccount?.address || null, suiClient);
+  
   const [dragActive, setDragActive] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [mintingNFT, setMintingNFT] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -69,14 +82,63 @@ const UploadPage: React.FC = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  /**
+   * Mint NFT for uploaded document
+   */
+  const mintNFTForDocument = async (file: File, blobId: string): Promise<string | null> => {
+    if (!currentAccount) {
+      console.error('No wallet connected for NFT minting');
+      return null;
+    }
+
+    try {
+      console.log('🎨 Minting NFT for document:', file.name, 'with blob ID:', blobId);
+      
+      const mintParams: MintNFTParams = {
+        walletAddress: currentAccount.address,
+        suiNSName: suiNSName || undefined,
+        blobId: blobId,
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        currentAccount: currentAccount,
+      };
+
+      // Prepare the transaction
+      const transaction = await documentNFTService.prepareMintTransaction(mintParams);
+
+      return new Promise((resolve, reject) => {
+        signAndExecuteTransaction(
+          { transaction },
+          {
+            onSuccess: (result) => {
+              console.log('✅ NFT minted successfully!', result);
+              showSuccess(`NFT minted successfully for ${file.name}!`);
+              resolve(result.digest);
+            },
+            onError: (error) => {
+              console.error('❌ NFT minting failed:', error);
+              showError(`Failed to mint NFT for ${file.name}: ${error.message}`);
+              reject(error);
+            },
+          }
+        );
+      });
+    } catch (error) {
+      console.error('❌ NFT minting preparation failed:', error);
+      showError(`Failed to prepare NFT minting for ${file.name}`);
+      return null;
+    }
+  };
+
   const handleUpload = async () => {
     if (!currentAccount) {
-      setNotification({ type: 'error', message: 'Please connect your wallet first' });
+      showError('Please connect your wallet first');
       return;
     }
 
     if (files.length === 0) {
-      setNotification({ type: 'error', message: 'Please select files to upload' });
+      showError('Please select files to upload');
       return;
     }
 
@@ -88,7 +150,7 @@ const UploadPage: React.FC = () => {
       
       const newUploadedFiles: UploadedFile[] = [];
       
-      // Upload each file to Walrus using real encryption
+      // Step 1: Upload each file to Walrus using real encryption
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         console.log(`📤 Uploading file ${i + 1}/${files.length}: ${file.name}`);
@@ -103,6 +165,7 @@ const UploadPage: React.FC = () => {
             type: file.type,
             blobId: result.blobId,
             uploadedAt: new Date(),
+            nftMinted: false,
           });
           console.log(`✅ Successfully uploaded: ${file.name} -> ${result.blobId}`);
         } else {
@@ -111,26 +174,56 @@ const UploadPage: React.FC = () => {
         }
       }
 
-      // Only update with real uploaded files
+      // Update with uploaded files first
       setUploadedFiles(prev => [...prev, ...newUploadedFiles]);
       setFiles([]);
-      setNotification({ 
-        type: 'success', 
-        message: `Successfully uploaded ${newUploadedFiles.length} file(s) to Walrus storage with encryption` 
-      });
+      showSuccess(`Successfully uploaded ${newUploadedFiles.length} file(s) to Walrus storage with encryption`);
       
       console.log('🎉 All files uploaded and encrypted successfully!', newUploadedFiles);
+      
+      // Step 2: Start NFT minting process
+      if (newUploadedFiles.length > 0) {
+        setMintingNFT(true);
+        showInfo(`Starting NFT minting for ${newUploadedFiles.length} document(s)...`);
+        
+        // Mint NFTs for each uploaded file
+        for (let i = 0; i < newUploadedFiles.length; i++) {
+          const uploadedFile = newUploadedFiles[i];
+          const originalFile = files[i];
+          
+          try {
+            console.log(`� Minting NFT ${i + 1}/${newUploadedFiles.length} for: ${uploadedFile.name}`);
+            
+            const nftDigest = await mintNFTForDocument(originalFile, uploadedFile.blobId);
+            
+            if (nftDigest) {
+              // Update the uploaded file with NFT info
+              setUploadedFiles(prev => 
+                prev.map(file => 
+                  file.blobId === uploadedFile.blobId 
+                    ? { ...file, nftId: nftDigest, nftMinted: true }
+                    : file
+                )
+              );
+              console.log(`✅ NFT minted for ${uploadedFile.name}: ${nftDigest}`);
+            }
+          } catch (error) {
+            console.error(`❌ Failed to mint NFT for ${uploadedFile.name}:`, error);
+            // Continue with other files even if one NFT minting fails
+          }
+        }
+        
+        showSuccess('🎨 NFT minting process completed! Check your wallet for verification certificates.');
+        setMintingNFT(false);
+      }
+      
     } catch (error) {
       console.error('❌ Upload failed:', error);
-      setNotification({ 
-        type: 'error', 
-        message: `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
-      });
+      showError(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setUploading(false);
+      setMintingNFT(false);
     }
-
-    setTimeout(() => setNotification(null), 5000);
   };
 
   const clearFiles = () => {
@@ -304,9 +397,9 @@ const UploadPage: React.FC = () => {
                   <div className="flex space-x-4 mt-8">
                     <button
                       onClick={handleUpload}
-                      disabled={uploading || files.length === 0}
+                      disabled={uploading || mintingNFT || files.length === 0}
                       className={`flex-1 py-4 px-6 rounded-2xl text-white font-clash font-medium transition-all duration-300 flex items-center justify-center space-x-2 ${
-                        uploading || files.length === 0
+                        uploading || mintingNFT || files.length === 0
                           ? "bg-gray-400 cursor-not-allowed"
                           : "bg-[#4da2ff] hover:bg-[#3d91ef] shadow-lg hover:shadow-xl hover:shadow-[#4da2ff]/25"
                       }`}
@@ -314,12 +407,19 @@ const UploadPage: React.FC = () => {
                       {uploading ? (
                         <>
                           <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          <span>Processing...</span>
+                          <span>Uploading...</span>
+                        </>
+                      ) : mintingNFT ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <Award className="w-5 h-5" />
+                          <span>Minting NFTs...</span>
                         </>
                       ) : (
                         <>
                           <Upload className="w-5 h-5" />
-                          <span>Upload & Encrypt</span>
+                          <Award className="w-4 h-4" />
+                          <span>Upload & Mint NFT</span>
                         </>
                       )}
                     </button>
@@ -385,15 +485,34 @@ const UploadPage: React.FC = () => {
                                 <p className="text-xs text-gray-600 font-clash mb-3">
                                   {formatFileSize(file.size)} • {file.uploadedAt.toLocaleDateString()}
                                 </p>
-                                <div className="flex items-center space-x-2">
+                                <div className="flex items-center space-x-2 mb-2">
                                   <Hash className="w-3 h-3 text-gray-500" />
                                   <p className="text-xs font-mono text-gray-500 truncate bg-gray-100 px-2 py-1 rounded">
                                     {file.blobId}
                                   </p>
                                 </div>
+                                {/* NFT Status */}
+                                {file.nftMinted ? (
+                                  <div className="flex items-center space-x-2">
+                                    <Award className="w-3 h-3 text-green-600" />
+                                    <p className="text-xs text-green-600 font-clash font-medium">
+                                      NFT Certificate Minted ✓
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center space-x-2">
+                                    <Award className="w-3 h-3 text-gray-400" />
+                                    <p className="text-xs text-gray-400 font-clash">
+                                      NFT Pending...
+                                    </p>
+                                  </div>
+                                )}
                               </div>
-                              <div className="flex-shrink-0">
+                              <div className="flex-shrink-0 flex flex-col items-center space-y-1">
                                 <CheckCircle className="w-6 h-6 text-[#4da2ff]" />
+                                {file.nftMinted && (
+                                  <Award className="w-5 h-5 text-green-600" />
+                                )}
                               </div>
                             </div>
                           </div>

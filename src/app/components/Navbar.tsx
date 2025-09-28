@@ -55,9 +55,9 @@ const Navbar: React.FC = () => {
               className="relative"
             >
               <img 
-                src="/logo.png" 
+                src="/cropimage.png" 
                 alt="SuiSeal Logo"
-                className="w-12 h-12 rounded-xl shadow-lg group-hover:shadow-xl transition-all duration-300"
+                className="w-12 h-12 rounded-lg shadow-lg group-hover:shadow-xl transition-all duration-300 object-cover"
                 onError={(e) => {
                   // Fallback to SVG if PNG is not available
                   e.currentTarget.src = "/logo.svg";
